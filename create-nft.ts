@@ -1,4 +1,5 @@
 import{
+    CollectionMasterEditionAccountInvalidError,
     createNft,
     fetchDigitalAsset,
     mplTokenMetadata,
@@ -14,7 +15,13 @@ import {
     Connection,
     LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
-import { generateSigner, Keypair, keypairIdentity, percentAmount } from "@metaplex-foundation/umi";
+import { 
+    generateSigner,
+    Keypair, 
+    keypairIdentity, 
+    percentAmount,
+    publicKey 
+} from "@metaplex-foundation/umi";
 
 async function main (){
     const connection = new Connection(clusterApiUrl("devnet"));
@@ -22,7 +29,6 @@ async function main (){
 const user = await getKeypairFromFile();
 
 await airdropIfRequired(connection, user.publicKey, 1 * LAMPORTS_PER_SOL, 0.5 * LAMPORTS_PER_SOL);
-
 console.log("User Loaded: ", user.publicKey.toBase58());
 //Initializing Umi instance
 const umi = createUmi(connection.rpcEndpoint);
@@ -34,28 +40,32 @@ umi.use(keypairIdentity(umiUser));
 
 console.log("Set up Umi instance for user");
 
-const collectionMint = generateSigner(umi);
-//Created NFT to represent collection.
-const transaction = await createNft(umi, {
-    mint: collectionMint,
-    name: "Tree Collection",
-    symbol: "ECO",
-    uri: "https://raw.githubusercontent.com/TaimoorKhan101/NFT/refs/heads/main/tree.json",
-    sellerFeeBasisPoints: percentAmount(0),
-    isCollection: true,
-} ).sendAndConfirm(umi);
+const collectionAddress = publicKey("2s3SsvNnaxywWyqzeYi3rBtLhTEVM9e9g9Gpm5VVdj1s");
+
+console.log("Creating NFT...");
+
+const mint = generateSigner(umi);
 
 try {
-    const createdCollectionNft = await fetchDigitalAsset(
-        umi,
-        collectionMint.publicKey,
-    );
+    const transaction = await createNft(umi, {
+        mint,
+        name: "Tree-1",
+        uri: "https://raw.githubusercontent.com/TaimoorKhan101/NFT/refs/heads/main/tree-1.json",
+        sellerFeeBasisPoints: percentAmount(0),
+        collection: {
+            key: collectionAddress,
+            verified: false,
+        },
+    });
     
-    console.log(`Collection NFT Created at Address: ${getExplorerLink("address", createdCollectionNft.mint.publicKey, "devnet")}`);    
+    await transaction.sendAndConfirm(umi);
+    
+    const createdNft = await fetchDigitalAsset(umi, mint.publicKey);
+    
+    console.log(`NFT created at Address: ${getExplorerLink("address", createdNft.mint.publicKey, "devnet")}`);    
 } catch (error) {
-    console.log("Error fetching collection NFT:", error);
+    console.error("Error creating NFT:", error);
 }
 
-}
 
-main();
+}
