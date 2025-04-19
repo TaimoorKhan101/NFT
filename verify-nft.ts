@@ -1,8 +1,9 @@
 import{
-    CollectionMasterEditionAccountInvalidError,
     createNft,
     fetchDigitalAsset,
+    findMetadataPda,
     mplTokenMetadata,
+    verifyCollectionV1,
 } from "@metaplex-foundation/mpl-token-metadata"
 import {
     airdropIfRequired,
@@ -15,14 +16,7 @@ import {
     Connection,
     LAMPORTS_PER_SOL,
 } from "@solana/web3.js"
-import { 
-    generateSigner,
-    Keypair, 
-    keypairIdentity, 
-    percentAmount,
-    publicKey 
-} from "@metaplex-foundation/umi";
-
+import { generateSigner, Keypair, keypairIdentity, percentAmount, publicKey } from "@metaplex-foundation/umi";
 
 async function main (){
     const connection = new Connection(clusterApiUrl("devnet"));
@@ -30,6 +24,7 @@ async function main (){
 const user = await getKeypairFromFile();
 
 await airdropIfRequired(connection, user.publicKey, 1 * LAMPORTS_PER_SOL, 0.5 * LAMPORTS_PER_SOL);
+
 console.log("User Loaded: ", user.publicKey.toBase58());
 //Initializing Umi instance
 const umi = createUmi(connection.rpcEndpoint);
@@ -42,31 +37,23 @@ umi.use(keypairIdentity(umiUser));
 console.log("Set up Umi instance for user");
 
 const collectionAddress = publicKey("2s3SsvNnaxywWyqzeYi3rBtLhTEVM9e9g9Gpm5VVdj1s");
+const nftAddress = publicKey("GnpFqtcEJwxkR9TSTMQ7GvkbZH2uutL1kkUZzTnEXqb2");
 
-console.log("Creating NFT...");
+const transaction = await verifyCollectionV1(umi, {
+    metadata: findMetadataPda(umi, {mint: nftAddress}),
+    collectionMint: collectionAddress,
+    authority: umi.identity
+});
 
-const mint = generateSigner(umi);
+transaction.sendAndConfirm(umi);
 
-try {
-    const transaction = await createNft(umi, {
-        mint,
-        name: "Tree-1",
-        uri: "https://raw.githubusercontent.com/TaimoorKhan101/NFT/refs/heads/main/tree-1.json",
-        sellerFeeBasisPoints: percentAmount(0),
-        collection: {
-            key: collectionAddress,
-            verified: false,
-        },
-    });
-    
-    await transaction.sendAndConfirm(umi);
-    
-    const createdNft = await fetchDigitalAsset(umi, mint.publicKey);
-    
-    console.log(`NFT created at Address: ${getExplorerLink("address", createdNft.mint.publicKey, "devnet")}`);    
-} catch (error) {
-    console.error("Error creating NFT:", error);
-}
+console.log(`NFT ${nftAddress} Verified as member of ${collectionAddress} Collection. See Explorer at ${getExplorerLink(
+    "address",
+    nftAddress,
+    "devnet"
+)}`
+);
+
 }
 
-main ();
+main();
